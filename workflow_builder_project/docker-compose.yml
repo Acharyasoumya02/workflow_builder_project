@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13
+    container_name: workflow_builder_postgres
+    environment:
+      POSTGRES_DB: workflow_builder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - workflow_network
+
+  # Backend Service
+  backend:
+    build: ./backend
+    container_name: workflow_builder_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/workflow_builder
+      CHROMA_DB_PATH: /app/chroma_db
+      UPLOAD_DIR: /app/uploads
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      SERP_API_KEY: ${SERP_API_KEY}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/chroma_db:/app/chroma_db
+    depends_on:
+      - postgres
+    networks:
+      - workflow_network
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build: ./frontend
+    container_name: workflow_builder_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - workflow_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  workflow_network:
+    driver: bridge
